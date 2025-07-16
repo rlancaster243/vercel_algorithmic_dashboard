@@ -22,14 +22,10 @@
       const [status, setStatus] = useState("Stopped");
       const [trades, setTrades] = useState([]);
       const chartRef = useRef(null);
-      const wsRef = useRef(null);
-
-      const WS_URL = import.meta.env.VITE_PRICE_FEED_WS;
-
 
       useEffect(() => {
         const ctx = chartRef.current.getContext("2d");
-        const priceChart = new Chart(ctx, {
+        new Chart(ctx, {
           type: 'line',
           data: {
             labels: Array.from({length: 24}, (_, i) => `${i}:00`),
@@ -53,31 +49,33 @@
         });
       }, []);
 
-      const startAlgo = () => {
-        setStatus("Running");
-        wsRef.current = new WebSocket(WS_URL);
-        wsRef.current.onmessage = (e) => {
+      useEffect(() => {
+        const poll = async () => {
           try {
-            const data = JSON.parse(e.data);
-            setPortfolio(prev => prev + (Math.random() - 0.5) * 100); // mock update
-            const newTrade = {
-              asset: 'BTC/USD',
-              type: 'BUY',
-              entry: 42560 + Math.random() * 100,
-              exit: 43280 + Math.random() * 100,
-              size: '0.25 BTC',
-              pl: '+1.7%',
-              time: new Date().toLocaleTimeString()
-            };
-            setTrades(prev => [newTrade, ...prev.slice(0, 9)]);
-          } catch {}
+            const res = await fetch('/api/price');
+            const data = await res.json();
+            if (data.price) {
+              setPortfolio(p => p + (Math.random() - 0.45) * 50);
+              setTrades(prev => [{
+                asset: 'BTC/USD',
+                type: 'BUY',
+                entry: data.price,
+                exit: data.price + Math.random() * 100,
+                size: '0.25 BTC',
+                pl: '+1.2%',
+                time: new Date().toLocaleTimeString()
+              }, ...prev.slice(0, 9)]);
+            }
+          } catch (e) {
+            console.warn('Polling error:', e.message);
+          }
         };
-      };
+        const interval = setInterval(poll, 5000);
+        poll();
+        return () => clearInterval(interval);
+      }, []);
 
-      const stopAlgo = () => {
-        setStatus("Stopped");
-        wsRef.current?.close();
-      };
+      const toggleStatus = () => setStatus(s => s === "Running" ? "Stopped" : "Running");
 
       return (
         <div className="p-6 space-y-6">
@@ -85,13 +83,7 @@
             <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-blue-500">
               <i className="fas fa-robot mr-2"></i> QuantumTrade
             </h1>
-            <div>
-              {status === "Running" ? (
-                <button onClick={stopAlgo} className="bg-red-600 px-4 py-2 rounded">Stop</button>
-              ) : (
-                <button onClick={startAlgo} className="bg-green-600 px-4 py-2 rounded">Start</button>
-              )}
-            </div>
+            <button onClick={toggleStatus} className={`px-4 py-2 rounded ${status === 'Running' ? 'bg-red-600' : 'bg-green-600'}`}>{status === 'Running' ? 'Stop' : 'Start'}</button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
