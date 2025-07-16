@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuantumTrade Dashboard</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-900 text-white">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function Dashboard() {
+      const [portfolio, setPortfolio] = useState(25742.36);
+      const [status, setStatus] = useState("Stopped");
+      const [trades, setTrades] = useState([]);
+      const chartRef = useRef(null);
+      const wsRef = useRef(null);
+
+      const WS_URL = import.meta.env.VITE_PRICE_FEED_WS;
+
+
+      useEffect(() => {
+        const ctx = chartRef.current.getContext("2d");
+        const priceChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+            datasets: [{
+              label: 'BTC/USD',
+              data: Array(24).fill().map(() => 42000 + Math.random() * 500),
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              fill: true,
+              tension: 0.4
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { labels: { color: 'white' } } },
+            scales: {
+              x: { ticks: { color: 'white' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+              y: { ticks: { color: 'white' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+            }
+          }
+        });
+      }, []);
+
+      const startAlgo = () => {
+        setStatus("Running");
+        wsRef.current = new WebSocket(WS_URL);
+        wsRef.current.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            setPortfolio(prev => prev + (Math.random() - 0.5) * 100); // mock update
+            const newTrade = {
+              asset: 'BTC/USD',
+              type: 'BUY',
+              entry: 42560 + Math.random() * 100,
+              exit: 43280 + Math.random() * 100,
+              size: '0.25 BTC',
+              pl: '+1.7%',
+              time: new Date().toLocaleTimeString()
+            };
+            setTrades(prev => [newTrade, ...prev.slice(0, 9)]);
+          } catch {}
+        };
+      };
+
+      const stopAlgo = () => {
+        setStatus("Stopped");
+        wsRef.current?.close();
+      };
+
+      return (
+        <div className="p-6 space-y-6">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-blue-500">
+              <i className="fas fa-robot mr-2"></i> QuantumTrade
+            </h1>
+            <div>
+              {status === "Running" ? (
+                <button onClick={stopAlgo} className="bg-red-600 px-4 py-2 rounded">Stop</button>
+              ) : (
+                <button onClick={startAlgo} className="bg-green-600 px-4 py-2 rounded">Start</button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white/10 p-4 rounded">
+              <p className="text-sm text-gray-400">Portfolio Value</p>
+              <h2 className="text-3xl font-bold mt-2">${portfolio.toFixed(2)}</h2>
+            </div>
+            <div className="bg-white/10 p-4 rounded">
+              <p className="text-sm text-gray-400">Status</p>
+              <h2 className={`text-xl font-bold mt-2 ${status === 'Running' ? 'text-green-400' : 'text-red-400'}`}>{status}</h2>
+            </div>
+          </div>
+
+          <div className="bg-white/10 p-4 rounded">
+            <h2 className="text-lg font-semibold mb-2">BTC/USD Chart</h2>
+            <canvas ref={chartRef} className="w-full h-64" />
+          </div>
+
+          <div className="bg-white/10 p-4 rounded">
+            <h2 className="text-lg font-semibold mb-2">Recent Trades</h2>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-gray-400">
+                  <th className="text-left">Asset</th>
+                  <th className="text-left">Type</th>
+                  <th className="text-left">Entry</th>
+                  <th className="text-left">Exit</th>
+                  <th className="text-left">Size</th>
+                  <th className="text-left">P/L</th>
+                  <th className="text-left">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trades.map((t, idx) => (
+                  <tr key={idx} className="border-t border-gray-700">
+                    <td>{t.asset}</td>
+                    <td className={t.type === 'BUY' ? 'text-green-400' : 'text-red-400'}>{t.type}</td>
+                    <td>${t.entry.toFixed(2)}</td>
+                    <td>${t.exit.toFixed(2)}</td>
+                    <td>{t.size}</td>
+                    <td className="text-green-400">{t.pl}</td>
+                    <td className="text-gray-400">{t.time}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<Dashboard />);
+  </script>
+</body>
+</html>
