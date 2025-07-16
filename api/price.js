@@ -8,9 +8,9 @@ export default async function handler(req, res) {
   };
 
   try {
-    const resp = await fetch('https://data.alpaca.markets/v1beta1/crypto/latest/trades?symbols=BTC/USD', { headers });
+    const resp = await fetch('https://paper-api.alpaca.markets/v2', { headers });
     const json = await resp.json();
-    const price = json['BTC/USD']?.trade?.p || null;
+    const price = json['AAPL']?.trade?.p || null;
     res.status(200).json({ price });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch price', details: err.message });
